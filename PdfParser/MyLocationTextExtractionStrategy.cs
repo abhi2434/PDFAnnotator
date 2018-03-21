@@ -27,20 +27,11 @@ namespace PdfParser
 
         private void DumpState()
         {
-            IEnumerator<TextChunk> enumerator = null;
-            try
+            foreach(var textChunk in this.locationalResult)
             {
-                enumerator = this.locationalResult.GetEnumerator();
-                while (enumerator.MoveNext())
-                {
-                    enumerator.Current.PrintDiagnostics();
-                    Console.WriteLine();
-                }
+                textChunk.PrintDiagnostics();
             }
-            finally
-            {
-                enumerator.Dispose();
-            }
+            
         }
 
         private bool EndsWithSpace(string str)
@@ -58,40 +49,40 @@ namespace PdfParser
 
         private Rectangle GetRectangleFromText(TextChunk firstChunk, TextChunk lastChunk, string pSearchString, string sTextinChunks, int iFromChar, int iToChar, StringComparison pStrComp)
         {
-            string str, str2; 
-            float num = lastChunk.PosRight - firstChunk.PosLeft;
-            float num2 = this.GetStringWidth(sTextinChunks, lastChunk.curFontSize, lastChunk.charSpaceWidth, this.ThisPdfDocFonts.Values.ElementAt<DocumentFont>(lastChunk.FontIndex));
-            float num3 = num / num2;
-            int index = sTextinChunks.IndexOf(pSearchString, pStrComp);
-            int num5 = (index + pSearchString.Length) - 1;
-            if (index == 0)
+            string tempText1, tempText2;
+            float lengthString = lastChunk.PosRight - firstChunk.PosLeft;
+            float stringWidth = this.GetStringWidth(sTextinChunks, lastChunk.curFontSize, lastChunk.charSpaceWidth, this.ThisPdfDocFonts.Values.ElementAt<DocumentFont>(lastChunk.FontIndex));
+            float ratio = lengthString / stringWidth;
+            int firstPosition = sTextinChunks.IndexOf(pSearchString, pStrComp);
+            int lastPosition = (firstPosition + pSearchString.Length) - 1;
+            if (firstPosition == 0)
             {
-                str = null;
+                tempText1 = null;
             }
             else
             {
-                str = sTextinChunks.Substring(0, index);
+                tempText1 = sTextinChunks.Substring(0, firstPosition);
             }
-            if (num5 == (sTextinChunks.Length - 1))
+            if (lastPosition == (sTextinChunks.Length - 1))
             {
-                str2 = null;
+                tempText2 = null;
             }
             else
             {
-                str2 = sTextinChunks.Substring(num5 + 1, (sTextinChunks.Length - num5) - 1);
+                tempText2 = sTextinChunks.Substring(lastPosition + 1, (sTextinChunks.Length - lastPosition) - 1);
             }
-            float num6 = 0f;
-            if (index > 0)
+            float textWidth = 0f;
+            if (firstPosition > 0)
             {
-                num6 = this.GetStringWidth(str, lastChunk.curFontSize, lastChunk.charSpaceWidth, this.ThisPdfDocFonts.Values.ElementAt<DocumentFont>(lastChunk.FontIndex)) * num3;
+                textWidth = this.GetStringWidth(tempText1, lastChunk.curFontSize, lastChunk.charSpaceWidth, this.ThisPdfDocFonts.Values.ElementAt<DocumentFont>(lastChunk.FontIndex)) * ratio;
             }
-            float num7 = 0f;
-            if (num5 < (sTextinChunks.Length - 1))
+            float textStringWidth = 0f;
+            if (lastPosition < (sTextinChunks.Length - 1))
             {
-                num7 = this.GetStringWidth(str2, lastChunk.curFontSize, lastChunk.charSpaceWidth, this.ThisPdfDocFonts.Values.ElementAt<DocumentFont>(lastChunk.FontIndex)) * num3;
+                textStringWidth = this.GetStringWidth(tempText2, lastChunk.curFontSize, lastChunk.charSpaceWidth, this.ThisPdfDocFonts.Values.ElementAt<DocumentFont>(lastChunk.FontIndex)) * ratio;
             }
-            float llx = firstChunk.distParallelStart + num6;
-            return new Rectangle(llx, firstChunk.PosBottom, lastChunk.distParallelEnd - num7, firstChunk.PosTop);
+            float llx = firstChunk.distParallelStart + textWidth;
+            return new Rectangle(llx, firstChunk.PosBottom, lastChunk.distParallelEnd - textStringWidth, firstChunk.PosTop);
         }
 
         public virtual string GetResultantText()
@@ -100,46 +91,45 @@ namespace PdfParser
             {
                 this.DumpState();
             }
-            //this.locationalResult.Sort();
-            StringBuilder builder = new StringBuilder();
-            TextChunk a = null;
-            foreach (TextChunk chunk2 in this.locationalResult)
+            var builder = new StringBuilder();
+            TextChunk theChunk = null;
+            foreach (TextChunk textChunk in this.locationalResult)
             {
-                if (a == null)
+                if (theChunk == null)
                 {
-                    builder.Append(chunk2.text);
+                    builder.Append(textChunk.text);
                 }
-                else if (chunk2.SameLine(a))
+                else if (textChunk.SameLine(theChunk))
                 {
-                    float num = chunk2.DistanceFromEndOf(a);
-                    if (num < -chunk2.charSpaceWidth)
+                    float num = textChunk.DistanceFromEndOf(theChunk);
+                    if (num < -textChunk.charSpaceWidth)
                     {
                         builder.Append(' ');
                     }
-                    else if (((num > (chunk2.charSpaceWidth / 2f)) && !this.StartsWithSpace(chunk2.text)) && !this.EndsWithSpace(a.text))
+                    else if (((num > (textChunk.charSpaceWidth / 2f)) && !this.StartsWithSpace(textChunk.text)) && !this.EndsWithSpace(theChunk.text))
                     {
                         builder.Append(' ');
                     }
-                    builder.Append(chunk2.text);
+                    builder.Append(textChunk.text);
                 }
                 else
                 {
                     builder.Append('\n');
-                    builder.Append(chunk2.text);
+                    builder.Append(textChunk.text);
                 }
-                a = chunk2;
+                theChunk = textChunk;
             }
             return builder.ToString();
         }
 
-        private float GetStringWidth(string str, float curFontSize, float pSingleSpaceWidth, DocumentFont pFont)
+        private float GetStringWidth(string currentText, float curFontSize, float pSingleSpaceWidth, DocumentFont pFont)
         {
-            char[] chArray = str.ToCharArray();
+            char[] chArray = currentText.ToCharArray();
             float left = 0f;
             float num3 = 0f;
-            foreach (char ch in chArray)
+            foreach (char theCharacter in chArray)
             {
-                num3 = (float)(((double)pFont.GetWidth(Convert.ToString(ch))) / 1000.0);
+                num3 = (float)(((double)pFont.GetWidth(Convert.ToString(theCharacter))) / 1000.0);
                 left += Convert.ToSingle(num3 * curFontSize);
             }
             return left;
@@ -159,22 +149,22 @@ namespace PdfParser
                 {
                     if (builder.ToString().IndexOf(pSearchString, pStrComp) > -1)
                     {
-                        string str2 = builder.ToString();
+                        string outputString = builder.ToString();
                         int num = 0;
-                        for (int i = str2.IndexOf(pSearchString, 0, pStrComp); i > -1; i = str2.IndexOf(pSearchString, i, pStrComp))
+                        for (int i = outputString.IndexOf(pSearchString, 0, pStrComp); i > -1; i = outputString.IndexOf(pSearchString, i, pStrComp))
                         {
                             num++;
-                            if ((i + pSearchString.Length) > str2.Length)
+                            if ((i + pSearchString.Length) > outputString.Length)
                             {
                                 break;
                             }
                             i += pSearchString.Length;
                         }
                         int startIndex = 0;
-                        int num4 = num;
-                        for (int j = 1; j <= num4; j++)
+                        int itemCounter = num;
+                        for (int j = 1; j <= itemCounter; j++)
                         {
-                            int iFromChar = str2.IndexOf(pSearchString, startIndex, pStrComp);
+                            int iFromChar = outputString.IndexOf(pSearchString, startIndex, pStrComp);
                             startIndex = iFromChar;
                             int iToChar = (iFromChar + pSearchString.Length) - 1;
                             string str3 = null;
@@ -227,22 +217,22 @@ namespace PdfParser
         public virtual void RenderText(TextRenderInfo renderInfo)
         {
             LineSegment baseline = renderInfo.GetBaseline();
-            TextChunk item = new TextChunk(renderInfo.GetText(), baseline.GetStartPoint(), baseline.GetEndPoint(), renderInfo.GetSingleSpaceWidth());
-            TextChunk chunk2 = item;
+            TextChunk renderedItem = new TextChunk(renderInfo.GetText(), baseline.GetStartPoint(), baseline.GetEndPoint(), renderInfo.GetSingleSpaceWidth());
+            TextChunk foundChunk = renderedItem;
             Debug.Print(renderInfo.GetText());
-            chunk2.PosLeft = renderInfo.GetDescentLine().GetStartPoint()[0];
-            chunk2.PosRight = renderInfo.GetAscentLine().GetEndPoint()[0];
-            chunk2.PosBottom = renderInfo.GetDescentLine().GetStartPoint()[1];
-            chunk2.PosTop = renderInfo.GetAscentLine().GetEndPoint()[1];
-            chunk2.curFontSize = chunk2.PosTop - baseline.GetStartPoint()[1];
-            string key = renderInfo.GetFont().PostscriptFontName + chunk2.curFontSize.ToString();
+            foundChunk.PosLeft = renderInfo.GetDescentLine().GetStartPoint()[0];
+            foundChunk.PosRight = renderInfo.GetAscentLine().GetEndPoint()[0];
+            foundChunk.PosBottom = renderInfo.GetDescentLine().GetStartPoint()[1];
+            foundChunk.PosTop = renderInfo.GetAscentLine().GetEndPoint()[1];
+            foundChunk.curFontSize = foundChunk.PosTop - baseline.GetStartPoint()[1];
+            string key = renderInfo.GetFont().PostscriptFontName + foundChunk.curFontSize.ToString();
             if (!this.ThisPdfDocFonts.ContainsKey(key))
             {
                 this.ThisPdfDocFonts.Add(key, renderInfo.GetFont());
             }
-            chunk2.FontIndex = this.ThisPdfDocFonts.IndexOfKey(key);
-            chunk2 = null;
-            this.locationalResult.Add(item);
+            foundChunk.FontIndex = this.ThisPdfDocFonts.IndexOfKey(key);
+            foundChunk = null;
+            this.locationalResult.Add(renderedItem);
         }
 
         private bool StartsWithSpace(string str)
